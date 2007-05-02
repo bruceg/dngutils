@@ -1,10 +1,10 @@
-#include <systime.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <msg/msg.h>
 #include "uint.h"

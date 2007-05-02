@@ -1,0 +1,13 @@
+- Remove dependancies on bglbis:
+  die*
+  uint16
+  uint32
+
+- Figure out why dng_validate.exe thinks tiled DNGs are invalid.
+
+- Fix the JPEG-LS code to handle channels<>2
+
+- Break out the DNG specific code from mrw2dng.c
+
+- Add an XMP block
+

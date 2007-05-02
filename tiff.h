@@ -2,8 +2,7 @@
 #define TIFF__H__
 
 #include <stdio.h>
-#include <uint16.h>
-#include <uint32.h>
+#include "uint.h"
 
 static inline uint32 round_long(uint32 i)
 {

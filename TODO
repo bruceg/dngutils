@@ -1,7 +1,7 @@
 - Remove dependancies on bglbis:
+  cli
   die*
-  uint16
-  uint32
+  systime.h
 
 - Figure out why dng_validate.exe thinks tiled DNGs are invalid.
 

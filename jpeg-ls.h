@@ -1,9 +1,8 @@
 #ifndef JPEG_LS__H__
 #define JPEG_LS__H__
 
-#include <sysdeps.h>
-
 #include "stream.h"
+#include "uint.h"
 
 #define M_SOF3 0xc3
 #define M_DHT 0xc4

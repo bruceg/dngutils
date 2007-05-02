@@ -1,7 +1,6 @@
 #include <string.h>
 #include <msg/msg.h>
-#include <uint16.h>
-#include <uint32.h>
+#include "uint.h"
 
 #include "mrw.h"
 

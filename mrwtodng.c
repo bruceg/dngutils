@@ -1,4 +1,3 @@
-#include <sysdeps.h>
 #include <systime.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -8,8 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <msg/msg.h>
-#include <uint16.h>
-#include <uint32.h>
+#include "uint.h"
 
 #include "jpeg-ls.h"
 #include "tiff.h"

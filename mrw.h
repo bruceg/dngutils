@@ -1,8 +1,8 @@
 #ifndef MRW__H__
 #define MRW__H__
 
-#include <sysdeps.h>
 #include <stdio.h>
+#include "uint.h"
 
 struct mrw_block
 {

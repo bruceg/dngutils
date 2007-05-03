@@ -1,3 +1,4 @@
+die.o
 jpeg-huffman.o
 jpeg-io.o
 jpeg-ls.o

@@ -1,8 +1,7 @@
 #include <string.h>
-#include <msg/msg.h>
-#include "uint.h"
-
+#include "die.h"
 #include "mrw.h"
+#include "uint.h"
 
 static int mrw_parse(struct mrw* mrw)
 {
@@ -25,7 +24,8 @@ static int mrw_parse(struct mrw* mrw)
     else if (memcmp(ptr, "\0PAD", 4) == 0)
       continue;
     else {
-      warnf("{Unknown MRW block type: }cccc", ptr[0], ptr[1], ptr[2], ptr[3]);
+      warn(0, "Unknown MRW block type: %c%c%c%c",
+	   ptr[0], ptr[1], ptr[2], ptr[3]);
       continue;
     }
 

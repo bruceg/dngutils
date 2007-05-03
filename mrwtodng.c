@@ -6,13 +6,13 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <msg/msg.h>
-#include "uint.h"
 
+#include "die.h"
 #include "jpeg-ls.h"
 #include "tiff.h"
 #include "mrw.h"
 #include "stream.h"
+#include "uint.h"
 #include "mrwtodng-cli.h"
 
 #define PREVIEW 0
@@ -48,7 +48,7 @@ static void parse_prd(void)
 		       "Konica Minolta Maxxum 7D");
   }
   else
-    die1(1, "Unknown camera model");
+    die(1, "Unknown camera model");
 
   tiff_ifd_add_long(&subifd1, ImageWidth, 1, mrw.width);
   tiff_ifd_add_long(&subifd1, ImageLength, 1, mrw.height);
@@ -62,14 +62,14 @@ static void parse_prd(void)
   tiff_ifd_add_rational(&subifd1, DefaultCropSize, 2, x, 1, y, 1);
 
   if (data[16] != 12)
-    die1(1, "Invalid DataSize number");
+    die(1, "Invalid DataSize number");
   if (data[17] != 12)
-    die1(1, "Invalid PixelSize number");
+    die(1, "Invalid PixelSize number");
   if (data[18] != 0x59)
-    die1(1, "Invalid StorageMethod number");
+    die(1, "Invalid StorageMethod number");
 
   if (uint16_get_msb(data + 22) != 1)
-    die1(1, "Invalid BayerPattern number");
+    die(1, "Invalid BayerPattern number");
   tiff_ifd_add_short(&subifd1, CFARepeatPattern, 2, 2, 2);
   tiff_ifd_add_byte(&subifd1, CFAPattern, 4, "\0\1\1\2");
   tiff_ifd_add_byte(&subifd1, CFAPlaneColor, 3, "\0\1\2");
@@ -221,7 +221,7 @@ static void parse_ttw_subtag(const unsigned char* start,
 			  newtag->data + i * 4);
       break;
     default:
-      warnf("{Unhandled SubEXIF type #}d", type);
+      warn(0, "Unhandled SubEXIF type #%d", type);
     }
   }
 }
@@ -260,7 +260,7 @@ static void parse_ttw_tag(const unsigned char* start,
   case ResolutionUnit:
     break;
   default:
-    warnf("{Unhandled EXIF tag #}d", tag);
+    warn(0, "Unhandled EXIF tag #%d", tag);
   }
   (void)type;
 }
@@ -294,7 +294,7 @@ static void parse_ifd(const unsigned char* start,
 static void parse_ttw(void)
 {
   if (memcmp(mrw.ttw.data, "MM\0\052\0\0\0\010", 8) != 0)
-    die1(1, "Invalid TTW block format");
+    die(1, "Invalid TTW block format");
 
   parse_ifd(mrw.ttw.data, 8, parse_ttw_tag);
 
@@ -553,10 +553,10 @@ int cli_main(int argc, char* argv[])
   FILE* out;
 
   if ((in = fopen(argv[0], "rb")) == 0)
-    diefsys(1, "{Could not open '}s{' for reading}", argv[0]);
+    die(-1, "Could not open '%d' for reading", argv[0]);
 
   if (!mrw_load(&mrw, in))
-    die1(1, "Error while loading MRW file");
+    die(1, "Error while loading MRW file");
   fclose(in);
 
   start_dng(argv[0]);
@@ -564,7 +564,7 @@ int cli_main(int argc, char* argv[])
   end_dng();
 
   if ((out = fopen(argv[1], "wb")) == 0)
-    diefsys(1, "{Could not open '}s{' for writing}", argv[1]);
+    die(-1, "Could not open '%d' for writing", argv[1]);
   tiff_start(out, 8);
   tiff_write_ifd(out, &mainifd);
   tiff_write_ifd(out, &subifd1);
@@ -576,7 +576,7 @@ int cli_main(int argc, char* argv[])
   write_image(out);
 
   if (fclose(out) != 0)
-    die1sys(1, "Could not write output");
+    die(-1, "Could not write output");
 
   return 0;
   (void)argc;

@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <msg/msg.h>
+#include "die.h"
 #include "tiff.h"
 
 const unsigned tiff_type_size[13] = {
@@ -265,7 +265,7 @@ uint32 tiff_write_ifd(FILE* out, struct tiff_ifd* ifd)
   }
 
   if (offset != (uint32)ftell(out))
-    die1(1, "Internal write error");
+    die(1, "Internal write error");
 
   if (offset % 4 != 0) {
     memset(buf, 0, 4);

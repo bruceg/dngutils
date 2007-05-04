@@ -1,5 +1,4 @@
-- Remove dependancies on bglbis:
-  cli
+- Fill in man page
 
 - Figure out why dng_validate.exe thinks tiled DNGs are invalid.
 

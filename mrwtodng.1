@@ -1,0 +1,26 @@
+.\" $Id$
+.TH mrwtodng 1
+.SH NAME
+mrwtodng \- Convert Minolta raw (MRW) files to digital negatives (DNG)
+.SH SYNOPSIS
+.B mrwtodng
+.I SOURCE.mrw DESTINATION.dng
+.SH OPTIONS
+.TP
+.B -c, --compress
+Compress the raw image data (default).
+.TP
+.B -C, --no-compress
+Do not compress the raw image data.
+.TP
+.B -t, --tile
+Break compressed data into tiles.
+.TP
+.B -T, --no-tile
+Compress the entire data as one block.
+.TP
+.B -h, --tile-height=UNS
+The maximum height of all the tiles.
+.TP
+.B -w, --tile-width=UNS
+The maximum width of all the tiles.

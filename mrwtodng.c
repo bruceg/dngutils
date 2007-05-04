@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -13,7 +15,23 @@
 #include "mrw.h"
 #include "stream.h"
 #include "uint.h"
-#include "mrwtodng-cli.h"
+
+const char program[] = "mrwtodng";
+const char usage[] =
+"Usage: mrwtodng [options] SOURCE.mrw DESTINATION.dng\n"
+"Convert Minolta raw (MRW) files to digital negatives (DNG)\n"
+"\n"
+"  -c, --compress         Compress the raw image data (default).\n"
+"  -C, --no-compress      Do not compress the raw image data.\n"
+"  -t, --tile             Break compressed data into tiles.\n"
+"  -T, --no-tile          Compress the entire data as one block.\n"
+"  -h, --tile-height=UNS  The maximum height of all the tiles.\n"
+"  -w, --tile-width=UNS   The maximum width of all the tiles.\n";
+
+static int opt_compress = 1;
+static int opt_tile = 1;
+static unsigned int opt_tile_height = 256;
+static unsigned int opt_tile_width = 256;
 
 #define PREVIEW 0
 
@@ -547,13 +565,47 @@ static void write_image(FILE* out)
     fwrite(mrw.raw, 2, mrw.width * mrw.height, out);
 }
 
-int cli_main(int argc, char* argv[])
+static const struct option long_options[] = {
+  { "compress", 0, &opt_compress, 1 },
+  { "no-compress", 0, &opt_compress, 0 },
+  { "tile", 0, &opt_tile, 1 },
+  { "no-tile", 0, &opt_tile, 0 },
+  { "tile-height", 0, 0, 'h' },
+  { "tile-width", 0, 0, 'w' },
+  { 0, 0, 0, 0 }
+};
+
+int main(int argc, char* argv[])
 {
   FILE* in;
   FILE* out;
+  int ch;
 
-  if ((in = fopen(argv[0], "rb")) == 0)
-    die(-1, "Could not open '%d' for reading", argv[0]);
+  while ((ch = getopt_long(argc, argv, "cCtTw:h:", long_options, 0)) != -1) {
+    switch (ch) {
+    case 0: break;
+    case 'c': opt_compress = 1; break;
+    case 'C': opt_compress = 0; break;
+    case 't': opt_tile = 1; break;
+    case 'T': opt_tile = 0; break;
+    case 'h':
+      if ((opt_tile_width = strtoul(optarg, 0, 10)) < 16)
+	die(1, "Invalid tile width: %s", optarg);
+      break;
+    case 'w':
+      if ((opt_tile_width = strtoul(optarg, 0, 10)) < 16)
+	die(1, "Invalid tile width: %s", optarg);
+      break;
+    default:
+      die_usage();
+    }
+  }
+
+  if (argc - optind != 2)
+    die_usage();
+  
+  if ((in = fopen(argv[optind], "rb")) == 0)
+    die(-1, "Could not open '%s' for reading", argv[optind]);
 
   if (!mrw_load(&mrw, in))
     die(1, "Error while loading MRW file");
@@ -563,8 +615,8 @@ int cli_main(int argc, char* argv[])
   parse_file();
   end_dng();
 
-  if ((out = fopen(argv[1], "wb")) == 0)
-    die(-1, "Could not open '%d' for writing", argv[1]);
+  if ((out = fopen(argv[optind + 1], "wb")) == 0)
+    die(-1, "Could not open '%s' for writing", argv[optind + 1]);
   tiff_start(out, 8);
   tiff_write_ifd(out, &mainifd);
   tiff_write_ifd(out, &subifd1);

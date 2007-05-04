@@ -35,3 +35,9 @@ void die(int code, const char* format, ...)
   va_end(ap);
   exit(abs(code));
 }
+
+void die_usage(void)
+{
+  fputs(usage, stderr);
+  exit(1);
+}

@@ -38,6 +38,7 @@ static unsigned int opt_tile_width = 256;
 static struct tiff_ifd mainifd;
 static struct tiff_ifd exififd;
 static struct tiff_ifd subifd1;
+static struct tiff_ifd iopifd;
 #if PREVIEW
 static struct tiff_ifd subifd2;
 #endif
@@ -48,10 +49,19 @@ static uint32 tile_count;
 static struct stream* compressed_data;
 static struct tiff_tag* raw_offset_tag;
 static struct tiff_tag* raw_length_tag;
+static struct tiff_tag* iop_offset_tag;
 
 static const unsigned char* thumbnail_start;
 static uint32 thumbnail_length;
 static const struct tiff_tag* thumbnail_offset_tag;
+
+static void parse_ifd(const unsigned char* start,
+		      uint32 offset,
+		      void (*fn)(const unsigned char* start,
+				 enum tiff_tag_id tag,
+				 enum tiff_tag_type type,
+				 uint32 count,
+				 uint32 value));
 
 static void parse_prd(void)
 {
@@ -114,14 +124,6 @@ static void parse_ttw_makernote(const unsigned char* start,
   (void)count;
 }
 
-static void parse_ifd(const unsigned char* start,
-		      uint32 offset,
-		      void (*fn)(const unsigned char* start,
-				 enum tiff_tag_id tag,
-				 enum tiff_tag_type type,
-				 uint32 count,
-				 uint32 value));
-
 /* DNGPrivateData is to contain:
 
 1) Six bytes containing the zero-terminated string "Adobe" (the DNG spec
@@ -178,69 +180,90 @@ static void add_makernote(const unsigned char* start,
   tiff_ifd_add_byte(&mainifd, DNGPrivateData, length, tmpstr);
 }
 
+static struct tiff_tag* copy_tag(struct tiff_ifd* ifd,
+				 const unsigned char* start,
+				 enum tiff_tag_id tag,
+				 enum tiff_tag_type type,
+				 uint32 count,
+				 uint32 value)
+{
+  struct tiff_tag* newtag;
+  uint32 i;
+  
+  newtag = tiff_ifd_add(ifd, tag, type, count);
+    
+  switch (type) {
+  case ASCII:
+  case UNDEFINED:
+    if (count > 4)
+      memcpy(newtag->data, start + value, newtag->size);
+    else {
+      for (i = 0; i < count; ++i, value <<= 8)
+	newtag->data[i] = value >> 24;
+    }
+    break;
+  case SHORT:
+  case SSHORT:
+    if (count == 1)
+      uint16_pack_lsb(value >> 16, newtag->data);
+    else if (count == 2) {
+      uint16_pack_lsb(value >> 16, newtag->data);
+      uint16_pack_lsb(value, newtag->data + 2);
+    }
+    else
+      for (i = 0; i < count; ++i)
+	uint16_pack_lsb(uint16_get_msb(start + value + i * 2),
+			newtag->data + i * 2);
+    break;
+  case RATIONAL:
+  case SRATIONAL:
+    for (i = 0; i < count; ++i) {
+      uint32_pack_lsb(uint32_get_msb(start + value + i * 8),
+		      newtag->data + i * 8);
+      uint32_pack_lsb(uint32_get_msb(start + value + i * 8 + 4),
+		      newtag->data + i * 8 + 4);
+    }
+    break;
+  case LONG:
+    if (count == 1)
+      uint32_pack_lsb(value, newtag->data);
+    else
+      for (i = 0; i < count; ++i)
+	uint32_pack_lsb(uint32_get_msb(start + value + i * 4),
+			newtag->data + i * 4);
+    break;
+  default:
+    warn(0, "Unhandled SubEXIF type #%d", type);
+  }
+  return newtag;
+}
+
+static void parse_ttw_iop(const unsigned char* start,
+			  enum tiff_tag_id tag,
+			  enum tiff_tag_type type,
+			  uint32 count,
+			  uint32 value)
+{
+  copy_tag(&iopifd, start, tag, type, count, value);
+}
+
 static void parse_ttw_subtag(const unsigned char* start,
 			     enum tiff_tag_id tag,
 			     enum tiff_tag_type type,
 			     uint32 count,
 			     uint32 value)
 {
-  struct tiff_tag* newtag;
-  uint32 i;
-  
   switch (tag) {
   case MakerNote:
     parse_ifd(start, value, parse_ttw_makernote);
     add_makernote(start + value, value, count);
     break;
   case InteroperabilityIFD:
-    // FIXME: should copy this IFD too
+    iop_offset_tag = tiff_ifd_add_long(&exififd, tag, 1, 0);
+    parse_ifd(start, value, parse_ttw_iop);
     break;
   default:
-    newtag = tiff_ifd_add(&exififd, tag, type, count);
-    
-    switch (type) {
-    case ASCII:
-    case UNDEFINED:
-      if (count > 4)
-	memcpy(newtag->data, start + value, newtag->size);
-      else {
-	for (i = 0; i < count; ++i, value <<= 8)
-	  newtag->data[i] = value >> 24;
-      }
-      break;
-    case SHORT:
-    case SSHORT:
-      if (count == 1)
-	uint16_pack_lsb(value >> 16, newtag->data);
-      else if (count == 2) {
-	uint16_pack_lsb(value >> 16, newtag->data);
-	uint16_pack_lsb(value, newtag->data + 2);
-      }
-      else
-	for (i = 0; i < count; ++i)
-	  uint16_pack_lsb(uint16_get_msb(start + value + i * 2),
-			  newtag->data + i * 2);
-      break;
-    case RATIONAL:
-    case SRATIONAL:
-      for (i = 0; i < count; ++i) {
-	uint32_pack_lsb(uint32_get_msb(start + value + i * 8),
-			newtag->data + i * 8);
-	uint32_pack_lsb(uint32_get_msb(start + value + i * 8 + 4),
-			newtag->data + i * 8 + 4);
-      }
-      break;
-    case LONG:
-      if (count == 1)
-	uint32_pack_lsb(value, newtag->data);
-      else
-	for (i = 0; i < count; ++i)
-	  uint32_pack_lsb(uint32_get_msb(start + value + i * 4),
-			  newtag->data + i * 4);
-      break;
-    default:
-      warn(0, "Unhandled SubEXIF type #%d", type);
-    }
+    copy_tag(&exififd, start, tag, type, count, value);
   }
 }
 
@@ -439,9 +462,14 @@ static void end_dng(void)
   uint32_pack_lsb(end, exif_tag->data);
   end += tiff_ifd_size(&exififd);
 
+  if (iop_offset_tag != 0) {
+    uint32_pack_lsb(end, iop_offset_tag->data);
+    end += tiff_ifd_size(&iopifd);
+  }
+  
   uint32_pack_lsb(end, thumbnail_offset_tag->data);
   end += thumbnail_length;
-  
+
   if (tile_count > 1) {
     for (tile = 0; tile < tile_count; ++tile) {
       uint32_pack_lsb(end, raw_offset_tag->data + tile * 4);
@@ -624,6 +652,8 @@ int main(int argc, char* argv[])
   tiff_write_ifd(out, &subifd2);
 #endif
   tiff_write_ifd(out, &exififd);
+  if (iop_offset_tag != 0)
+    tiff_write_ifd(out, &iopifd);
   write_thumbnail(out);
   write_image(out);
 

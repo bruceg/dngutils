@@ -594,12 +594,12 @@ static void write_image(FILE* out)
 }
 
 static const struct option long_options[] = {
-  { "compress", 0, &opt_compress, 1 },
-  { "no-compress", 0, &opt_compress, 0 },
-  { "tile", 0, &opt_tile, 1 },
-  { "no-tile", 0, &opt_tile, 0 },
-  { "tile-height", 0, 0, 'h' },
-  { "tile-width", 0, 0, 'w' },
+  { "compress", no_argument, &opt_compress, 1 },
+  { "no-compress", no_argument, &opt_compress, 0 },
+  { "tile", no_argument, &opt_tile, 1 },
+  { "no-tile", no_argument, &opt_tile, 0 },
+  { "tile-height", required_argument, 0, 'h' },
+  { "tile-width", required_argument, 0, 'w' },
   { 0, 0, 0, 0 }
 };
 

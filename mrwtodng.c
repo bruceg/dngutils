@@ -617,8 +617,8 @@ int main(int argc, char* argv[])
     case 't': opt_tile = 1; break;
     case 'T': opt_tile = 0; break;
     case 'h':
-      if ((opt_tile_width = strtoul(optarg, 0, 10)) < 16)
-	die(1, "Invalid tile width: %s", optarg);
+      if ((opt_tile_height = strtoul(optarg, 0, 10)) < 16)
+	die(1, "Invalid tile height: %s", optarg);
       break;
     case 'w':
       if ((opt_tile_width = strtoul(optarg, 0, 10)) < 16)
@@ -639,7 +639,7 @@ int main(int argc, char* argv[])
     die(1, "Error while loading MRW file");
   fclose(in);
 
-  start_dng(argv[0]);
+  start_dng(argv[optind]);
   parse_file();
   end_dng();
 

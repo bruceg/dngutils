@@ -26,28 +26,18 @@ struct tiff_tag* tiff_ifd_add(struct tiff_ifd* ifd,
 			      uint32 count)
 {
   struct tiff_tag* tag;
-  uint16 i;
-  for (tag = 0, i = ifd->count; i > 0; --i) {
-    if (ifd->tags[i].tag == id) {
-      free(ifd->tags[i].data);
-      tag = &ifd->tags[i];
+
+  for (tag = ifd->tags; tag != 0; tag = tag->next) {
+    if (tag->tag == id) {
+      free(tag->data);
       break;
     }
   }
-  if (!tag) {
-    while (ifd->count >= ifd->size) {
-      uint16 newsize;
-      struct tiff_tag* newtags;
-      newsize = (ifd->size == 0) ? 8 : (ifd->size * 2);
-      newtags = malloc(newsize * sizeof *newtags);
-      memcpy(newtags, ifd->tags, ifd->count * sizeof *newtags);
-      free(ifd->tags);
-      ifd->tags = newtags;
-      ifd->size = newsize;
-    }
-
-    tag = &ifd->tags[ifd->count];
+  if (tag == 0) {
+    tag = malloc(sizeof *tag);
     ++ifd->count;
+    tag->next = ifd->tags;
+    ifd->tags = tag;
   }
 
   tag->tag = id;
@@ -191,25 +181,109 @@ struct tiff_tag* tiff_ifd_add_srational(struct tiff_ifd* ifd,
   return tag;
 }
 
-static int tiff_tag_cmp(const void* aptr, const void* bptr)
+static struct tiff_tag* tiff_tag_sort(struct tiff_tag* list)
 {
-  const struct tiff_tag* a = aptr;
-  const struct tiff_tag* b = bptr;
-  return a->tag - b->tag;
+  struct tiff_tag* p;
+  struct tiff_tag* q;
+  struct tiff_tag* e;
+  struct tiff_tag* tail;
+  int insize;
+  int nmerges;
+  int psize;
+  int qsize;
+  int i;
+  
+  if (list == 0)
+    return 0;
+
+  insize = 1;
+  for (;;) {
+    p = list;
+    list = 0;
+    tail = 0;
+
+    nmerges = 0;  /* count number of merges we do in this pass */
+
+    while (p != 0) {
+      nmerges++;  /* there exists a merge to be done */
+      /* step `insize' places along from p */
+      q = p;
+      psize = 0;
+      for (i = 0; i < insize; i++) {
+	psize++;
+	q = q->next;
+	if (q == 0)
+	  break;
+      }
+
+      /* if q hasn't fallen off end, we have two lists to merge */
+      qsize = insize;
+
+      /* now we have two lists; merge them */
+      while (psize > 0 || (qsize > 0 && q != 0)) {
+
+	/* decide whether next element of merge comes from p or q */
+	if (psize == 0) {
+	  /* p is empty; e must come from q. */
+	  e = q;
+	  q = q->next;
+	  qsize--;
+	} else if (qsize == 0 || q == 0) {
+	  /* q is empty; e must come from p. */
+	  e = p;
+	  p = p->next;
+	  psize--;
+	} else if (p->tag < q->tag) {
+	  /* First element of p is lower (or same);
+	   * e must come from p. */
+	  e = p;
+	  p = p->next;
+	  psize--;
+	} else {
+	  /* First element of q is lower; e must come from q. */
+	  e = q;
+	  q = q->next;
+	  qsize--;
+	}
+
+	/* add the next element to the merged list */
+	if (tail != 0) {
+	  tail->next = e;
+	} else {
+	  list = e;
+	}
+	tail = e;
+      }
+
+      /* now p has stepped `insize' places along, and q has too */
+      p = q;
+    }
+    tail->next = 0;
+
+    /* If we have done only one merge, we're finished. */
+    if (nmerges <= 1)   /* allow for nmerges==0, the empty list case */
+      return list;
+
+    /* Otherwise repeat, merging lists twice the size */
+    insize *= 2;
+  }
 }
 
+  
 void tiff_ifd_sort(struct tiff_ifd* ifd)
 {
-  qsort(ifd->tags, ifd->count, sizeof *ifd->tags, tiff_tag_cmp);
+  /* Merge sort for lists adapted from the algorithm presented at:
+     http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
+  */
+  ifd->tags = tiff_tag_sort(ifd->tags);
 }
 
 uint32 tiff_ifd_size(const struct tiff_ifd* ifd)
 {
   uint32 total;
   const struct tiff_tag* tag;
-  uint32 i;
 
-  for (total = 0, i = 0, tag = ifd->tags; i < ifd->count; ++i, ++tag) {
+  for (total = 0, tag = ifd->tags; tag != 0; tag = tag->next) {
     if (tag->size > 4)
       total += tag->size;
   }
@@ -226,7 +300,6 @@ void tiff_start(FILE* out, uint32 offset)
 
 uint32 tiff_write_ifd(FILE* out, struct tiff_ifd* ifd)
 {
-  uint32 i;
   struct tiff_tag* tag;
   uint32 start;
   uint32 offset;
@@ -240,7 +313,7 @@ uint32 tiff_write_ifd(FILE* out, struct tiff_ifd* ifd)
   uint16_pack_lsb(ifd->count, buf);
   fwrite(buf, 1, 2, out);
 
-  for (i = 0, tag = ifd->tags; i < ifd->count; ++i, ++tag) {
+  for (tag = ifd->tags; tag != 0; tag = tag->next) {
     uint16_pack_lsb(tag->tag, buf);
     uint16_pack_lsb(tag->type, buf + 2);
     uint32_pack_lsb(tag->count, buf + 4);
@@ -259,7 +332,7 @@ uint32 tiff_write_ifd(FILE* out, struct tiff_ifd* ifd)
   uint32_pack_lsb(0, buf);
   fwrite(buf, 1, 4, out);
 
-  for (i = 0, tag = ifd->tags; i < ifd->count; ++i, ++tag) {
+  for (tag = ifd->tags; tag != 0; tag = tag->next) {
     if (tag->size > 4)
       fwrite(tag->data, 1, tag->size, out);
   }

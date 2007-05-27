@@ -32,6 +32,7 @@ enum tiff_tag_type {
 
 struct tiff_tag
 {
+  struct tiff_tag* next;
   enum tiff_tag_id tag;
   enum tiff_tag_type type;
   uint32 count;
@@ -44,7 +45,6 @@ struct tiff_tag
 struct tiff_ifd
 {
   uint16 count;
-  uint16 size;
   struct tiff_tag* tags;
 };
 

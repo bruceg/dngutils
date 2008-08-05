@@ -1,10 +1,10 @@
-- Fill in man page
+- Fill in README
 
-- Figure out why dng_validate.exe thinks tiled DNGs are invalid.
-
-- Fix the JPEG-LS code to handle channels<>2
+- Figure out why dng_validate.exe thinks DNGs are invalid.
 
 - Break out the DNG specific code from mrw2dng.c
 
 - Add an XMP block
 
+- Fix the JPEG-LS code to handle channels<>2 (low priority since all
+  MRWs will only use 2-channel mode)

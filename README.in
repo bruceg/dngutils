@@ -22,8 +22,6 @@ Requirements:
 
 Installation:
 
-- Make sure the latest version of bglibs from
-  http://untroubled.org/bglibs/ is compiled and installed.
 - Build the sources by running "make"
 - After the package has been compiled, run "make install" as root.
 

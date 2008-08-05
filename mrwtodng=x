@@ -5,6 +5,5 @@ jpeg-ls.o
 mrw.o
 stream.o
 tiff_make.o
--lbg
 -lm
 -ljpeg

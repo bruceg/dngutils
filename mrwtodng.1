@@ -4,23 +4,59 @@
 mrwtodng \- Convert Minolta raw (MRW) files to digital negatives (DNG)
 .SH SYNOPSIS
 .B mrwtodng
+[
+.B OPTIONS
+]
 .I SOURCE.mrw DESTINATION.dng
+.SH DESCRIPTION
+This program converts raw images from Minolta digital cameras to Adobe
+digital negative files.  The resulting file includes the thumbnail
+embeded in the makernotes section for a preview image.
 .SH OPTIONS
 .TP
 .B -c, --compress
-Compress the raw image data (default).
+Compress the raw image data.  This is the default.
 .TP
 .B -C, --no-compress
-Do not compress the raw image data.
+Do not compress the raw image data.  Since the image data in the
+original MRW file is packed but DNG doesn't support such packing, this
+produces output files approximately 25% larger than the source.
 .TP
 .B -t, --tile
-Break compressed data into tiles.
+Break compressed data into tiles.  This is the default.  Uncompressed
+data is never tiled.
 .TP
 .B -T, --no-tile
 Compress the entire data as one block.
 .TP
 .B -h, --tile-height=UNS
-The maximum height of all the tiles.
+The maximum height of all the tiles in pixels.  Defaults to 256.
 .TP
 .B -w, --tile-width=UNS
-The maximum width of all the tiles.
+The maximum width of all the tiles in pixels.  Defaults to 256.
+.SH NOTES
+Unlike most compressed data formats, breaking up the compressed data
+into tiles actually reduces the total size of the compressed data.  The
+tile size of 256 was chosen to minimize the compressed data size after
+testing a variety of tile sizes over a number of MRW files.  A tile size
+of 512 fared slightly better for some files, but slightly worse in
+general.  All tile sizes larger than 512 and smaller than 256 produced
+consistently larger files.  Tiled data also lets multi-threaded DNG
+loaders decompress different parts of the raw data in parallel.
+.SH BUGS
+This program has only been tested with MRW files from a Minolta Maxxum
+7D.  It likely will not work without adjustments with other Minolta
+digital cameras.  If you would like support for your Minolta digital
+camera, please send me sample files and I will make the necessary
+adjustments.
+.P
+The output files from this program do not validate with the
+dng_validate.exe program included with Adobe's DNG SDK when compression
+and tiling are both enabled.  The error message gives no details as to
+why it does not validate, and the source code in the SDK is similarly
+unenlightening.  Both uncompressed and non-tiled images validate with no
+problems.  The compressed tiled DNG files work fine with all the RAW
+programs I tried (dcraw, ufraw, RawTherapee, and LightZone), so I have
+been unable to correct this flaw.
+.SH AUTHOR
+Bruce Guenter <bruce@untroubled.org>

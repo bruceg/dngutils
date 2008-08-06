@@ -28,7 +28,6 @@ static void calc_frequency(unsigned long freq[256],
 			   const uint16* data,
 			   unsigned rows,
 			   unsigned cols,
-			   unsigned channels,
 			   unsigned bit_depth,
 			   unsigned row_step,
 			   unsigned col_step)
@@ -83,7 +82,6 @@ static void encode_image(struct bitstream* stream,
 			const uint16* data,
 			unsigned rows,
 			unsigned cols,
-			unsigned channels,
 			unsigned bit_depth,
 			unsigned row_step,
 			unsigned col_step,
@@ -99,7 +97,7 @@ static void encode_image(struct bitstream* stream,
   int diff1;
   
   pred0 = pred1 = 1 << (bit_depth - 1);
-  
+
   for (row = 0, rowptr = data; row < rows; ++row, rowptr += row_step) {
     for (col = 0, colptr = rowptr; col < cols; ++col, colptr += col_step) {
       diff0 = colptr[0] - pred0;
@@ -140,16 +138,17 @@ int jpeg_ls_encode(struct stream* stream,
 
   /* FIXME: This encoder only handles 2-channel data from raw images. */
   assert(channels == 2);
+  assert(channels == col_step);
 
   init_numbits();
   memset(freq, 0, sizeof freq);
-  calc_frequency(freq, data, rows, cols, channels, bit_depth,
+  calc_frequency(freq, data, rows, cols, bit_depth,
 		 row_step, col_step);
 
   jpeg_huffman_generate(&huffman, freq);
 
   jpeg_write_start(&bitstream, rows, cols, channels, bit_depth, &huffman, 0);
-  encode_image(&bitstream, data, rows, cols, channels, bit_depth,
+  encode_image(&bitstream, data, rows, cols, bit_depth,
 	       row_step, col_step, &huffman);
   jpeg_write_end(&bitstream);
 

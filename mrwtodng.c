@@ -482,17 +482,19 @@ static void end_dng(void)
 
 static uint32 compress_block(struct stream* out,
 			     uint32 xoffset,
-			     uint32 width,
+			     uint32 enc_width,
+			     uint32 out_width,
 			     uint32 yoffset,
-			     uint32 height)
+			     uint32 enc_height,
+			     uint32 out_height)
 {
   uint32 length;
   
   stream_init(out);
   jpeg_ls_encode(out,
 		 mrw.raw + xoffset + yoffset * mrw.width,
-		 height,
-		 width / 2,
+		 enc_height, out_height,
+		 enc_width / 2, out_width / 2,
 		 2,
 		 12,
 		 mrw.width,
@@ -535,8 +537,10 @@ static void parse_raw(void)
 	  raw_size = compress_block(&compressed_data[tile],
 				    x,
 				    minu(mrw.width - x, opt_tile_width),
+				    opt_tile_width,
 				    y,
-				    minu(mrw.height - y, opt_tile_height));
+				    minu(mrw.height - y, opt_tile_height),
+				    opt_tile_height);
 	  uint32_pack_lsb(raw_size, raw_length_tag->data + tile * 4);
 	}
       }
@@ -544,7 +548,9 @@ static void parse_raw(void)
     else {
       tile_count = 1;
       compressed_data = malloc(sizeof *compressed_data);
-      raw_size = compress_block(compressed_data, 0, mrw.width, 0, mrw.height);
+      raw_size = compress_block(compressed_data,
+				0, mrw.width, mrw.width,
+				0, mrw.height, mrw.height);
 
       raw_offset_tag = tiff_ifd_add_long(&subifd1, StripOffset, 1, 0);
       tiff_ifd_add_long(&subifd1, RowsPerStrip, 1, mrw.height);

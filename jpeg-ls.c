@@ -26,8 +26,10 @@ static void count_diff(int diff, unsigned long freq[256])
 
 static void calc_frequency(unsigned long freq[256],
 			   const uint16* data,
-			   unsigned rows,
-			   unsigned cols,
+			   unsigned enc_rows,
+			   unsigned out_rows,
+			   unsigned enc_cols,
+			   unsigned out_cols,
 			   unsigned bit_depth,
 			   unsigned row_step,
 			   unsigned col_step)
@@ -43,8 +45,12 @@ static void calc_frequency(unsigned long freq[256],
   
   pred0 = pred1 = 1 << (bit_depth - 1);
   
-  for (row = 0, rowptr = data; row < rows; ++row, rowptr += row_step) {
-    for (col = 0, colptr = rowptr; col < cols; ++col, colptr += col_step) {
+  for (row = 0, rowptr = data;
+       row < enc_rows;
+       ++row, rowptr += row_step) {
+    for (col = 0, colptr = rowptr;
+	 col < enc_cols;
+	 ++col, colptr += col_step) {
       diff0 = colptr[0] - pred0;
       diff1 = colptr[1] - pred1;
 
@@ -54,8 +60,18 @@ static void calc_frequency(unsigned long freq[256],
       pred0 += diff0;
       pred1 += diff1;
     }
+    for (; col < out_cols; ++col) {
+      count_diff(0, freq);
+      count_diff(0, freq);
+    }
     pred0 = rowptr[0];
     pred1 = rowptr[1];
+  }
+  for (; row < out_rows; ++row) {
+    for (col = 0; col < out_cols; ++col) {
+      count_diff(0, freq);
+      count_diff(0, freq);
+    }
   }
 }
 
@@ -79,13 +95,15 @@ static void write_diff(struct bitstream* stream,
 }
 
 static void encode_image(struct bitstream* stream,
-			const uint16* data,
-			unsigned rows,
-			unsigned cols,
-			unsigned bit_depth,
-			unsigned row_step,
-			unsigned col_step,
-			const struct jpeg_huffman_encoder* huffman)
+			 const uint16* data,
+			 unsigned enc_rows,
+			 unsigned out_rows,
+			 unsigned enc_cols,
+			 unsigned out_cols,
+			 unsigned bit_depth,
+			 unsigned row_step,
+			 unsigned col_step,
+			 const struct jpeg_huffman_encoder* huffman)
 {
   unsigned row;
   unsigned col;
@@ -98,8 +116,12 @@ static void encode_image(struct bitstream* stream,
   
   pred0 = pred1 = 1 << (bit_depth - 1);
 
-  for (row = 0, rowptr = data; row < rows; ++row, rowptr += row_step) {
-    for (col = 0, colptr = rowptr; col < cols; ++col, colptr += col_step) {
+  for (row = 0, rowptr = data;
+       row < enc_rows;
+       ++row, rowptr += row_step) {
+    for (col = 0, colptr = rowptr;
+	 col < enc_cols;
+	 ++col, colptr += col_step) {
       diff0 = colptr[0] - pred0;
       diff1 = colptr[1] - pred1;
 
@@ -109,8 +131,18 @@ static void encode_image(struct bitstream* stream,
       pred0 += diff0;
       pred1 += diff1;
     }
+    for (; col < out_cols; ++col) {
+      write_diff(stream, 0, huffman);
+      write_diff(stream, 0, huffman);
+    }
     pred0 = rowptr[0];
     pred1 = rowptr[1];
+  }
+  for (; row < out_rows; ++row) {
+    for (col = 0; col < out_cols; ++col) {
+      write_diff(stream, 0, huffman);
+      write_diff(stream, 0, huffman);
+    }
   }
   jpeg_write_flush(stream);
 }
@@ -118,8 +150,10 @@ static void encode_image(struct bitstream* stream,
 /*****************************************************************************/
 int jpeg_ls_encode(struct stream* stream,
 		   const uint16* data,
-		   unsigned rows,
-		   unsigned cols,
+		   unsigned enc_rows,
+		   unsigned out_rows,
+		   unsigned enc_cols,
+		   unsigned out_cols,
 		   unsigned channels,
 		   unsigned bit_depth,
 		   unsigned row_step,
@@ -142,13 +176,13 @@ int jpeg_ls_encode(struct stream* stream,
 
   init_numbits();
   memset(freq, 0, sizeof freq);
-  calc_frequency(freq, data, rows, cols, bit_depth,
+  calc_frequency(freq, data, enc_rows, out_rows, enc_cols, out_cols, bit_depth,
 		 row_step, col_step);
 
   jpeg_huffman_generate(&huffman, freq);
 
-  jpeg_write_start(&bitstream, rows, cols, channels, bit_depth, &huffman, 0);
-  encode_image(&bitstream, data, rows, cols, bit_depth,
+  jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth, &huffman, 0);
+  encode_image(&bitstream, data, enc_rows, out_rows, enc_cols, out_cols, bit_depth,
 	       row_step, col_step, &huffman);
   jpeg_write_end(&bitstream);
 

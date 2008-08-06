@@ -48,8 +48,10 @@ extern void jpeg_write_end(struct bitstream* stream);
 
 extern int jpeg_ls_encode(struct stream* stream,
 			  const uint16* data,
-			  unsigned rows,
-			  unsigned cols,
+			  unsigned enc_rows,
+			  unsigned out_rows,
+			  unsigned enc_cols,
+			  unsigned out_cols,
 			  unsigned channels,
 			  unsigned bit_depth,
 			  unsigned row_step,

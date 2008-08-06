@@ -32,7 +32,8 @@ Compress the entire data as one block.
 The maximum height of all the tiles in pixels.  Defaults to 256.
 .TP
 .B -w, --tile-width=UNS
-The maximum width of all the tiles in pixels.  Defaults to 256.
+The maximum width of all the tiles in pixels.  Defaults to 256.  Since
+pixels are compressed in pairs, this number must be even.
 .SH NOTES
 Unlike most compressed data formats, breaking up the compressed data
 into tiles actually reduces the total size of the compressed data.  The

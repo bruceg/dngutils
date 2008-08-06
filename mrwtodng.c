@@ -623,6 +623,8 @@ int main(int argc, char* argv[])
     case 'w':
       if ((opt_tile_width = strtoul(optarg, 0, 10)) < 16)
 	die(1, "Invalid tile width: %s", optarg);
+      if (opt_tile_width % 2 != 0)
+	die(1, "Tile width must be even: %s", optarg);
       break;
     default:
       die_usage();

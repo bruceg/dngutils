@@ -30,8 +30,8 @@ const char usage[] =
 
 static int opt_compress = 1;
 static int opt_tile = 1;
-static unsigned int opt_tile_height = 256;
-static unsigned int opt_tile_width = 256;
+static unsigned int opt_tile_height = 0;
+static unsigned int opt_tile_width = 0;
 
 #define PREVIEW 0
 
@@ -511,10 +511,33 @@ inline uint32 minu(uint32 a, uint32 b)
   return (a < b) ? a : b;
 }
 
-static void parse_raw(void)
+static void calc_tiles(void)
 {
   int tile_w;
   int tile_h;
+
+  /* The optimal tile size leaves the minimum number of leftover pixels,
+   * and is between 256 and 512. Since width must be even, its
+   * calculation is a little more complicated. */
+  if (opt_tile_width == 0) {
+    for (opt_tile_width = mrw.width;
+	 opt_tile_width >= 512 && opt_tile_width % 4 == 0;
+	 opt_tile_width /= 2)
+      ;
+    /* printf("calculated tile width = %u\n", opt_tile_width); */
+  }
+  if (opt_tile_height == 0) {
+    opt_tile_height = mrw.height / (mrw.height / 256) + (mrw.height % 256 != 0);
+    /* printf("calculated tile height = %u\n", opt_tile_height); */
+  }
+
+  tile_w = (mrw.width + opt_tile_width - 1) / opt_tile_width;
+  tile_h = (mrw.height + opt_tile_height - 1) / opt_tile_height;
+  tile_count = tile_w * tile_h;
+}
+
+static void parse_raw(void)
+{
   uint32 x;
   uint32 y;
   int tile;
@@ -522,9 +545,7 @@ static void parse_raw(void)
 
   if (opt_compress) {
     if (opt_tile) {
-      tile_w = (mrw.width + opt_tile_width - 1) / opt_tile_width;
-      tile_h = (mrw.height + opt_tile_height - 1) / opt_tile_height;
-      tile_count = tile_w * tile_h;
+      calc_tiles();
       compressed_data = malloc(tile_count * sizeof *compressed_data);
 
       tiff_ifd_add_long(&subifd1, TileWidth, 1, opt_tile_width);

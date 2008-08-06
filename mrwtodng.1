@@ -29,20 +29,22 @@ data is never tiled.
 Compress the entire data as one block.
 .TP
 .B -h, --tile-height=UNS
-The maximum height of all the tiles in pixels.  Defaults to 256.
+The maximum height of all the tiles in pixels.
 .TP
 .B -w, --tile-width=UNS
-The maximum width of all the tiles in pixels.  Defaults to 256.  Since
-pixels are compressed in pairs, this number must be even.
+The maximum width of all the tiles in pixels.  Since pixels are
+compressed in pairs, this number must be even.
 .SH NOTES
+The default tile size is computed from the input file width and height
+to be the number between 256 and 512 that leaves the fewest leftover
+pixels to encode.  The limits of 256 and 512 were chosen after
+experimentation of various tile sizes over a number of MRW files.  Both
+larger and smaller sizes produced worse results in general.
+.P
 Unlike most compressed data formats, breaking up the compressed data
-into tiles actually reduces the total size of the compressed data.  The
-tile size of 256 was chosen to minimize the compressed data size after
-testing a variety of tile sizes over a number of MRW files.  A tile size
-of 512 fared slightly better for some files, but slightly worse in
-general.  All tile sizes larger than 512 and smaller than 256 produced
-consistently larger files.  Tiled data also lets multi-threaded DNG
-loaders decompress different parts of the raw data in parallel.
+into tiles can frequently actually reduce the total size of the
+compressed data.  Tiled data also lets multi-threaded DNG loaders
+decompress different parts of the raw data in parallel.
 .SH BUGS
 This program has only been tested with MRW files from a Minolta Maxxum
 7D.  It likely will not work without adjustments with other Minolta

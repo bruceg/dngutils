@@ -24,7 +24,7 @@ static void count_diff(int diff, unsigned long freq[256])
   ++freq[numbits[diff]];
 }
 
-static void calc_frequency(unsigned long freq[256],
+static void calc_frequency(unsigned long freq[][256],
 			   const uint16* data,
 			   unsigned enc_rows,
 			   unsigned out_rows,
@@ -54,23 +54,23 @@ static void calc_frequency(unsigned long freq[256],
       diff0 = colptr[0] - pred0;
       diff1 = colptr[1] - pred1;
 
-      count_diff(diff0, freq);
-      count_diff(diff1, freq);
+      count_diff(diff0, freq[0]);
+      count_diff(diff1, freq[0]);
 
       pred0 += diff0;
       pred1 += diff1;
     }
     for (; col < out_cols; ++col) {
-      count_diff(0, freq);
-      count_diff(0, freq);
+      count_diff(0, freq[0]);
+      count_diff(0, freq[0]);
     }
     pred0 = rowptr[0];
     pred1 = rowptr[1];
   }
   for (; row < out_rows; ++row) {
     for (col = 0; col < out_cols; ++col) {
-      count_diff(0, freq);
-      count_diff(0, freq);
+      count_diff(0, freq[0]);
+      count_diff(0, freq[0]);
     }
   }
 }
@@ -103,7 +103,7 @@ static void encode_image(struct bitstream* stream,
 			 unsigned bit_depth,
 			 unsigned row_step,
 			 unsigned col_step,
-			 const struct jpeg_huffman_encoder* huffman)
+			 const struct jpeg_huffman_encoder huffman[1])
 {
   unsigned row;
   unsigned col;
@@ -125,23 +125,23 @@ static void encode_image(struct bitstream* stream,
       diff0 = colptr[0] - pred0;
       diff1 = colptr[1] - pred1;
 
-      write_diff(stream, diff0, huffman);
-      write_diff(stream, diff1, huffman);
+      write_diff(stream, diff0, &huffman[0]);
+      write_diff(stream, diff1, &huffman[0]);
 
       pred0 += diff0;
       pred1 += diff1;
     }
     for (; col < out_cols; ++col) {
-      write_diff(stream, 0, huffman);
-      write_diff(stream, 0, huffman);
+      write_diff(stream, 0, &huffman[0]);
+      write_diff(stream, 0, &huffman[0]);
     }
     pred0 = rowptr[0];
     pred1 = rowptr[1];
   }
   for (; row < out_rows; ++row) {
     for (col = 0; col < out_cols; ++col) {
-      write_diff(stream, 0, huffman);
-      write_diff(stream, 0, huffman);
+      write_diff(stream, 0, &huffman[0]);
+      write_diff(stream, 0, &huffman[0]);
     }
   }
   jpeg_write_flush(stream);
@@ -159,8 +159,8 @@ int jpeg_ls_encode(struct stream* stream,
 		   unsigned row_step,
 		   unsigned col_step)
 {
-  struct jpeg_huffman_encoder huffman;
-  unsigned long freq[256];
+  struct jpeg_huffman_encoder huffman[1];
+  unsigned long freq[1][256];
   struct bitstream bitstream = { stream, 0, 0 };
 
   /* FIXME: This implementation uses a single huffman table for all the
@@ -179,11 +179,11 @@ int jpeg_ls_encode(struct stream* stream,
   calc_frequency(freq, data, enc_rows, out_rows, enc_cols, out_cols, bit_depth,
 		 row_step, col_step);
 
-  jpeg_huffman_generate(&huffman, freq);
+  jpeg_huffman_generate(&huffman[0], freq[0]);
 
-  jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth, &huffman, 0);
+  jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth, huffman, 0);
   encode_image(&bitstream, data, enc_rows, out_rows, enc_cols, out_cols, bit_depth,
-	       row_step, col_step, &huffman);
+	       row_step, col_step, huffman);
   jpeg_write_end(&bitstream);
 
   return 1;

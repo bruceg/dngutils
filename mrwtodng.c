@@ -497,8 +497,7 @@ static uint32 compress_block(struct stream* out,
 		 enc_width / 2, out_width / 2,
 		 2,
 		 12,
-		 mrw.width,
-		 2);
+		 mrw.width);
   if ((length = stream_length(out)) & 1) {
     stream_putc(out, 0);
     ++length;

@@ -54,7 +54,7 @@ extern int jpeg_ls_encode(struct stream* stream,
 			  unsigned out_cols,
 			  unsigned channels,
 			  unsigned bit_depth,
-			  unsigned row_step,
+			  unsigned row_width,
 			  unsigned col_step);
 
 #endif

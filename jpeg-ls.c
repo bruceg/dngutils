@@ -31,7 +31,7 @@ static void calc_frequency(unsigned long freq[][256],
 			   unsigned enc_cols,
 			   unsigned out_cols,
 			   unsigned bit_depth,
-			   unsigned row_step,
+			   unsigned row_width,
 			   unsigned col_step,
 			   int multi_table)
 {
@@ -49,7 +49,7 @@ static void calc_frequency(unsigned long freq[][256],
   
   for (row = 0, rowptr = data;
        row < enc_rows;
-       ++row, rowptr += row_step) {
+       ++row, rowptr += row_width) {
     for (col = 0, colptr = rowptr;
 	 col < enc_cols;
 	 ++col, colptr += col_step) {
@@ -103,7 +103,7 @@ static void encode_image(struct bitstream* stream,
 			 unsigned enc_cols,
 			 unsigned out_cols,
 			 unsigned bit_depth,
-			 unsigned row_step,
+			 unsigned row_width,
 			 unsigned col_step,
 			 const struct jpeg_huffman_encoder huffman[],
 			 int multi_table)
@@ -122,7 +122,7 @@ static void encode_image(struct bitstream* stream,
 
   for (row = 0, rowptr = data;
        row < enc_rows;
-       ++row, rowptr += row_step) {
+       ++row, rowptr += row_width) {
     for (col = 0, colptr = rowptr;
 	 col < enc_cols;
 	 ++col, colptr += col_step) {
@@ -160,7 +160,7 @@ int jpeg_ls_encode(struct stream* stream,
 		   unsigned out_cols,
 		   unsigned channels,
 		   unsigned bit_depth,
-		   unsigned row_step,
+		   unsigned row_width,
 		   unsigned col_step)
 {
   struct jpeg_huffman_encoder huffman[2];
@@ -175,7 +175,7 @@ int jpeg_ls_encode(struct stream* stream,
   init_numbits();
   memset(freq, 0, sizeof freq);
   calc_frequency(freq, data, enc_rows, out_rows, enc_cols, out_cols,
-		 bit_depth, row_step, col_step, multi_table);
+		 bit_depth, row_width, col_step, multi_table);
 
   jpeg_huffman_generate(&huffman[0], freq[0]);
   if (multi_table)
@@ -184,7 +184,7 @@ int jpeg_ls_encode(struct stream* stream,
   jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth,
 		   huffman, multi_table);
   encode_image(&bitstream, data, enc_rows, out_rows, enc_cols, out_cols,
-	       bit_depth, row_step, col_step, huffman, multi_table);
+	       bit_depth, row_width, col_step, huffman, multi_table);
   jpeg_write_end(&bitstream);
 
   return 1;

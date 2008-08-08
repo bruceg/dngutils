@@ -77,6 +77,12 @@ static void process_image(struct bitstream* stream,
   for (row = 0;
        row < enc_rows;
        ++row, rowptr += row_width) {
+
+    if (row > 0 && (row % 2) == 0) {
+      pred0 = rowptr[-row_width*2];
+      pred1 = rowptr[-row_width*2+1];
+    }
+
     for (col = 0, colptr = rowptr;
 	 col < enc_cols;
 	 ++col, colptr += channels) {
@@ -92,10 +98,6 @@ static void process_image(struct bitstream* stream,
     for (; col < out_cols; ++col) {
       fn(stream, 0, data[0]);
       fn(stream, 0, data[table1]);
-    }
-    if ((row % 2) == 1) {
-      pred0 = rowptr[-row_width];
-      pred1 = rowptr[-row_width+1];
     }
   }
   for (; row < out_rows; ++row) {

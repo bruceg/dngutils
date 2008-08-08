@@ -93,8 +93,10 @@ static void process_image(struct bitstream* stream,
       fn(stream, 0, data[0]);
       fn(stream, 0, data[table1]);
     }
-    pred0 = rowptr[0];
-    pred1 = rowptr[1];
+    if ((row & 1) == 1) {
+      pred0 = rowptr[-row_width];
+      pred1 = rowptr[-row_width+1];
+    }
   }
   for (; row < out_rows; ++row) {
     for (col = 0; col < out_cols; ++col) {
@@ -136,7 +138,28 @@ int jpeg_ls_encode(struct stream* stream,
   if (multi_table)
     jpeg_huffman_generate(&huffman[1], freq[1]);
 
-  jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth,
+  /* The Bayer image matrix is typically similar to:
+   *
+   * RGRGRG...
+   * GBGBGB...
+   * RGRGRG...
+   * GBGBGB...
+   *
+   * When JPEG-LS predictors are used that use pixels above the current
+   * pixel, this pattern produces bad results since different colors are
+   * used to predict.  By outputting one row for every input row, the
+   * resulting data becomes:
+   *
+   * RGRGRG...GBGBGB...
+   * RGRGRG...GBGBGB...
+   * 
+   * Thus allowing same color pixels to line up between rows.  Since the
+   * color pairs switch in the middle of a row, there will be a pair of
+   * poor predictions made at that switch, but that's a relatively minor
+   * effect compared to the benefits of allowing better prediction
+   * above. */
+  /* FIXME: this 2-row merging should be made adjustable too. */
+  jpeg_write_start(&bitstream, out_rows/2, out_cols*2, channels, bit_depth,
 		   huffman, multi_table, 1);
   dataptrs[0] = &huffman[0];
   dataptrs[1] = &huffman[1];

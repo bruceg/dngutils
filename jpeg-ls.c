@@ -17,70 +17,22 @@ static void init_numbits(void)
   }
 }
 
-static void count_diff(int diff, unsigned long freq[256])
+static void count_diff(struct bitstream* stream,
+		       int diff,
+		       void* dataptr)
 {
+  unsigned long* freq = dataptr;
   if (diff < 0)
     diff = -diff;
   ++freq[numbits[diff]];
-}
-
-static void calc_frequency(unsigned long freq[][256],
-			   const uint16* data,
-			   unsigned enc_rows,
-			   unsigned out_rows,
-			   unsigned enc_cols,
-			   unsigned out_cols,
-			   unsigned channels,
-			   unsigned bit_depth,
-			   unsigned row_width,
-			   int multi_table)
-{
-  unsigned row;
-  unsigned col;
-  const uint16* rowptr;
-  const uint16* colptr;
-  unsigned pred0;
-  unsigned pred1;
-  int diff0;
-  int diff1;
-  const int table1 = !!multi_table;
-  
-  pred0 = pred1 = 1 << (bit_depth - 1);
-  
-  for (row = 0, rowptr = data;
-       row < enc_rows;
-       ++row, rowptr += row_width) {
-    for (col = 0, colptr = rowptr;
-	 col < enc_cols;
-	 ++col, colptr += channels) {
-      diff0 = colptr[0] - pred0;
-      diff1 = colptr[1] - pred1;
-
-      count_diff(diff0, freq[0]);
-      count_diff(diff1, freq[table1]);
-
-      pred0 += diff0;
-      pred1 += diff1;
-    }
-    for (; col < out_cols; ++col) {
-      count_diff(0, freq[0]);
-      count_diff(0, freq[table1]);
-    }
-    pred0 = rowptr[0];
-    pred1 = rowptr[1];
-  }
-  for (; row < out_rows; ++row) {
-    for (col = 0; col < out_cols; ++col) {
-      count_diff(0, freq[0]);
-      count_diff(0, freq[table1]);
-    }
-  }
+  (void)stream;
 }
 
 static void write_diff(struct bitstream* stream,
 		       int diff,
-		       const struct jpeg_huffman_encoder* huffman)
+		       void* dataptr)
 {
+  const struct jpeg_huffman_encoder* huffman = dataptr;
   int data;
   unsigned bits;
   
@@ -96,21 +48,23 @@ static void write_diff(struct bitstream* stream,
     jpeg_write_bits(stream, bits, data & ~(~0U << bits));
 }
 
-static void encode_image(struct bitstream* stream,
-			 const uint16* data,
-			 unsigned enc_rows,
-			 unsigned out_rows,
-			 unsigned enc_cols,
-			 unsigned out_cols,
-			 unsigned channels,
-			 unsigned bit_depth,
-			 unsigned row_width,
-			 const struct jpeg_huffman_encoder huffman[],
-			 int multi_table)
+static void process_image(struct bitstream* stream,
+			  void (*fn)(struct bitstream* stream,
+				     int diff,
+				     void* data),
+			  const uint16* rowptr,
+			  unsigned enc_rows,
+			  unsigned out_rows,
+			  unsigned enc_cols,
+			  unsigned out_cols,
+			  unsigned channels,
+			  unsigned bit_depth,
+			  unsigned row_width,
+			  void* data[],
+			  int multi_table)
 {
   unsigned row;
   unsigned col;
-  const uint16* rowptr;
   const uint16* colptr;
   unsigned pred0;
   unsigned pred1;
@@ -120,7 +74,7 @@ static void encode_image(struct bitstream* stream,
   
   pred0 = pred1 = 1 << (bit_depth - 1);
 
-  for (row = 0, rowptr = data;
+  for (row = 0;
        row < enc_rows;
        ++row, rowptr += row_width) {
     for (col = 0, colptr = rowptr;
@@ -129,26 +83,25 @@ static void encode_image(struct bitstream* stream,
       diff0 = colptr[0] - pred0;
       diff1 = colptr[1] - pred1;
 
-      write_diff(stream, diff0, &huffman[0]);
-      write_diff(stream, diff1, &huffman[table1]);
+      fn(stream, diff0, data[0]);
+      fn(stream, diff1, data[table1]);
 
       pred0 += diff0;
       pred1 += diff1;
     }
     for (; col < out_cols; ++col) {
-      write_diff(stream, 0, &huffman[0]);
-      write_diff(stream, 0, &huffman[table1]);
+      fn(stream, 0, data[0]);
+      fn(stream, 0, data[table1]);
     }
     pred0 = rowptr[0];
     pred1 = rowptr[1];
   }
   for (; row < out_rows; ++row) {
     for (col = 0; col < out_cols; ++col) {
-      write_diff(stream, 0, &huffman[0]);
-      write_diff(stream, 0, &huffman[table1]);
+      fn(stream, 0, data[0]);
+      fn(stream, 0, data[table1]);
     }
   }
-  jpeg_write_flush(stream);
 }
 
 /*****************************************************************************/
@@ -166,14 +119,18 @@ int jpeg_ls_encode(struct stream* stream,
   unsigned long freq[2][256];
   struct bitstream bitstream = { stream, 0, 0 };
   int multi_table = 1;
+  void* dataptrs[2];
 
   /* FIXME: This encoder only handles 2-channel data from raw images. */
   assert(channels == 2);
 
   init_numbits();
   memset(freq, 0, sizeof freq);
-  calc_frequency(freq, data, enc_rows, out_rows, enc_cols, out_cols,
-		 channels, bit_depth, row_width, multi_table);
+  dataptrs[0] = freq[0];
+  dataptrs[1] = freq[1];
+  process_image(0, count_diff, data,
+		enc_rows, out_rows, enc_cols, out_cols,
+		channels, bit_depth, row_width, dataptrs, multi_table);
 
   jpeg_huffman_generate(&huffman[0], freq[0]);
   if (multi_table)
@@ -181,8 +138,12 @@ int jpeg_ls_encode(struct stream* stream,
 
   jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth,
 		   huffman, multi_table);
-  encode_image(&bitstream, data, enc_rows, out_rows, enc_cols, out_cols,
-	       channels, bit_depth, row_width, huffman, multi_table);
+  dataptrs[0] = &huffman[0];
+  dataptrs[1] = &huffman[1];
+  process_image(&bitstream, write_diff, data,
+		enc_rows, out_rows, enc_cols, out_cols,
+		channels, bit_depth, row_width, dataptrs, multi_table);
+  jpeg_write_flush(&bitstream);
   jpeg_write_end(&bitstream);
 
   return 1;

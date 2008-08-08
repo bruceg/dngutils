@@ -515,18 +515,14 @@ static void calc_tiles(void)
   int tile_w;
   int tile_h;
 
-  /* The optimal tile size leaves the minimum number of leftover pixels,
-   * and is between 256 and 512. Since width must be even, its
-   * calculation is a little more complicated. */
   if (opt_tile_width == 0) {
-    for (opt_tile_width = mrw.width;
-	 opt_tile_width >= 512 && opt_tile_width % 4 == 0;
-	 opt_tile_width /= 2)
-      ;
+    opt_tile_width = mrw.width / (mrw.width / 256) + (mrw.width % 256 != 0);
+    opt_tile_width += opt_tile_width & 1;
     /* printf("calculated tile width = %u\n", opt_tile_width); */
   }
   if (opt_tile_height == 0) {
     opt_tile_height = mrw.height / (mrw.height / 256) + (mrw.height % 256 != 0);
+    opt_tile_height += opt_tile_height & 1;
     /* printf("calculated tile height = %u\n", opt_tile_height); */
   }
 

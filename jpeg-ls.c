@@ -137,7 +137,7 @@ int jpeg_ls_encode(struct stream* stream,
     jpeg_huffman_generate(&huffman[1], freq[1]);
 
   jpeg_write_start(&bitstream, out_rows, out_cols, channels, bit_depth,
-		   huffman, multi_table);
+		   huffman, multi_table, 1);
   dataptrs[0] = &huffman[0];
   dataptrs[1] = &huffman[1];
   process_image(&bitstream, write_diff, data,

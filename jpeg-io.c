@@ -89,7 +89,8 @@ void jpeg_write_start(struct bitstream* stream,
 		      unsigned channels,
 		      unsigned bit_depth,
 		      struct jpeg_huffman_encoder* huffman,
-		      int multi_table)
+		      int multi_table,
+		      int predictor)
 {
   unsigned channel;
   
@@ -127,7 +128,7 @@ void jpeg_write_start(struct bitstream* stream,
 		    ? channel << 4 
 		    : 0);	/* Td[n] | Ta[n] */
   }
-  jpeg_write_byte(stream, 1);	/* Ss -- only use predictor 1 */
+  jpeg_write_byte(stream, predictor); /* Ss */
   jpeg_write_byte(stream, 0);	/* Se */
   jpeg_write_byte(stream, 0);	/* Ah | Al */
 }

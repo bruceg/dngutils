@@ -43,7 +43,8 @@ extern void jpeg_write_start(struct bitstream* stream,
 			     unsigned channels,
 			     unsigned bit_depth,
 			     struct jpeg_huffman_encoder* huffman,
-			     int multi_table);
+			     int multi_table,
+			     int predictor);
 extern void jpeg_write_end(struct bitstream* stream);
 
 extern int jpeg_ls_encode(struct stream* stream,

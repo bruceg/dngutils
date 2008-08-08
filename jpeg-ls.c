@@ -86,14 +86,14 @@ static void process_image(struct bitstream* stream,
       fn(stream, diff0, data[0]);
       fn(stream, diff1, data[table1]);
 
-      pred0 += diff0;
-      pred1 += diff1;
+      pred0 = colptr[0];
+      pred1 = colptr[1];
     }
     for (; col < out_cols; ++col) {
       fn(stream, 0, data[0]);
       fn(stream, 0, data[table1]);
     }
-    if ((row & 1) == 1) {
+    if ((row % 2) == 1) {
       pred0 = rowptr[-row_width];
       pred1 = rowptr[-row_width+1];
     }

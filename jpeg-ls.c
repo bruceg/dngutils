@@ -56,7 +56,8 @@ static void process_row(struct bitstream* stream,
 			const uint16* row1,
 			unsigned cols,
 			void* data[],
-			int table1)
+			int table1,
+			int predictor)
 {
   unsigned col;
   int pred0;
@@ -75,8 +76,42 @@ static void process_row(struct bitstream* stream,
     fn(stream, diff0, data[0]);
     fn(stream, diff1, data[table1]);
 
-    pred0 = row1[0];
-    pred1 = row1[1];
+    /* Predictor context: Px is the predictor to calculate. Ra is the
+     * just encoded pixel and Rc and Rb are the pixels above as follows:
+     *
+     * Rc Rb
+     * Ra Px
+     */
+    switch (predictor) {
+    case 1:			/* Px = Ra */
+      pred0 = row1[0];
+      pred1 = row1[1];
+      break;
+    case 2:			/* Px = Rb */
+      pred0 = row0[2];
+      pred1 = row0[3];
+      break;
+    case 3:			/* Px = Rc */
+      pred0 = row0[0];
+      pred1 = row0[1];
+      break;
+    case 4:			/* Px = Ra + Rb - Rc */
+      pred0 = row1[0] + row0[2] - row0[0];
+      pred1 = row1[1] + row0[3] - row0[1];
+      break;
+    case 5:			/* Px = Ra + ((Rb - Rc) >> 1) */
+      pred0 = row1[0] + ((row0[2] - row0[0]) >> 1);
+      pred1 = row1[1] + ((row0[3] - row0[1]) >> 1);
+      break;
+    case 6:			/* Px = Rb + ((Ra - Rc) >> 1) */
+      pred0 = row0[2] + ((row1[0] - row0[0]) >> 1);
+      pred1 = row0[3] + ((row1[1] - row0[1]) >> 1);
+      break;
+    case 7:
+      pred0 = (row1[0] + row0[2]) / 2;
+      pred1 = (row1[1] + row0[3]) / 2;
+      break;
+    }
   }
 }
 
@@ -93,7 +128,8 @@ static void process_image(struct bitstream* stream,
 			  unsigned bit_depth,
 			  unsigned row_width,
 			  void* data[],
-			  int multi_table)
+			  int multi_table,
+			  int predictor)
 {
   unsigned row;
   unsigned vrow;
@@ -127,17 +163,28 @@ static void process_image(struct bitstream* stream,
       rowptr += row_width;
     }
 
-    process_row(stream, fn, vrow0, vrow1, out_cols * 2, data, table1);
+    process_row(stream, fn, vrow0, vrow1, out_cols * 2, data, table1,
+		(row == 0) ? 1 : predictor);
 
     ptr = vrow0;
     vrow0 = vrow1;
     vrow1 = ptr;
   }
   for (; row < out_rows; row += 2) {
-    for (col = 0; col < out_cols * 2; ++col) {
+#if 0
+    /* This doesn't work for predictors 5 and 6, and so the bitstream is
+     * larger. */
+    for (col = 0; col < out_cols * 2 / channels; ++col) {
       fn(stream, 0, data[0]);
       fn(stream, 0, data[table1]);
     }
+#else
+    process_row(stream, fn, vrow0, vrow1, out_cols * 2, data, table1,
+		predictor);
+    ptr = vrow0;
+    vrow0 = vrow1;
+    vrow1 = ptr;
+#endif
   }
 }
 
@@ -157,6 +204,7 @@ int jpeg_ls_encode(struct stream* stream,
   struct bitstream bitstream = { stream, 0, 0 };
   int multi_table = 1;
   void* dataptrs[2];
+  int predictor = 7;
 
   /* FIXME: This encoder only handles 2-channel data from raw images. */
   assert(channels == 2);
@@ -167,7 +215,8 @@ int jpeg_ls_encode(struct stream* stream,
   dataptrs[1] = freq[1];
   process_image(0, count_diff, data,
 		enc_rows, out_rows, enc_cols, out_cols,
-		channels, bit_depth, row_width, dataptrs, multi_table);
+		channels, bit_depth, row_width, dataptrs,
+		multi_table, predictor);
 
   jpeg_huffman_generate(&huffman[0], freq[0]);
   if (multi_table)
@@ -195,12 +244,13 @@ int jpeg_ls_encode(struct stream* stream,
    * above. */
   /* FIXME: this 2-row merging should be made adjustable too. */
   jpeg_write_start(&bitstream, out_rows/2, out_cols*2, channels, bit_depth,
-		   huffman, multi_table, 1);
+		   huffman, multi_table, predictor);
   dataptrs[0] = &huffman[0];
   dataptrs[1] = &huffman[1];
   process_image(&bitstream, write_diff, data,
 		enc_rows, out_rows, enc_cols, out_cols,
-		channels, bit_depth, row_width, dataptrs, multi_table);
+		channels, bit_depth, row_width, dataptrs,
+		multi_table, predictor);
   jpeg_write_flush(&bitstream);
   jpeg_write_end(&bitstream);
 

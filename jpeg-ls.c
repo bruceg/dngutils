@@ -197,27 +197,35 @@ static int best_predictor(const uint16* data,
 			  unsigned bit_depth,
 			  unsigned row_width,
 			  int multi_table,
-			  unsigned long freq[8][2][256])
+			  struct jpeg_huffman_encoder huffman[8][2])
 {
   unsigned long bestbits;
   unsigned long bits;
-  int i;
+  unsigned i;
   int bestpred;
   int pred;
   void* dataptrs[2];
+  unsigned long freq[2][256];
 
-  memset(freq, 0, sizeof freq);
   bestbits = ~0UL;
+  bestpred = 1;
   for (pred = 1; pred < 8; ++pred) {
-    dataptrs[0] = freq[pred][0];
-    dataptrs[1] = freq[pred][1];
+    memset(freq, 0, sizeof freq);
+    dataptrs[0] = freq[0];
+    dataptrs[1] = freq[1];
     process_image(0, count_diff, data,
 		  enc_rows, out_rows, enc_cols, out_cols,
 		  channels, bit_depth, row_width, dataptrs,
 		  multi_table, pred);
+    jpeg_huffman_generate(&huffman[pred][0], freq[0]);
+    if (multi_table)
+      jpeg_huffman_generate(&huffman[pred][1], freq[1]);
     /* Estimate roughly the number of bits used by this encoding. */
     for (bits = 0, i = 0; i < bit_depth; ++i)
-      bits += i * freq[pred][0][i];
+      bits += (huffman[pred][0].ehufsi[i] + i) * freq[0][i];
+    if (multi_table)
+      for (bits = 0, i = 0; i < bit_depth; ++i)
+	bits += (huffman[pred][1].ehufsi[i] + i) * freq[1][i];
     if (bits < bestbits) {
       bestbits = bits;
       bestpred = pred;
@@ -237,8 +245,7 @@ int jpeg_ls_encode(struct stream* stream,
 		   unsigned bit_depth,
 		   unsigned row_width)
 {
-  struct jpeg_huffman_encoder huffman[2];
-  unsigned long freq[8][2][256];
+  struct jpeg_huffman_encoder huffman[8][2];
   struct bitstream bitstream = { stream, 0, 0 };
   int multi_table = 1;
   void* dataptrs[2];
@@ -248,13 +255,9 @@ int jpeg_ls_encode(struct stream* stream,
   assert(channels == 2);
 
   init_numbits();
-  memset(freq, 0, sizeof freq);
   predictor = best_predictor(data, enc_rows, out_rows, enc_cols, out_cols,
-			     channels, bit_depth, row_width, multi_table, freq);
-
-  jpeg_huffman_generate(&huffman[0], freq[predictor][0]);
-  if (multi_table)
-    jpeg_huffman_generate(&huffman[1], freq[predictor][1]);
+			     channels, bit_depth, row_width, multi_table,
+			     huffman);
 
   /* The Bayer image matrix is typically similar to:
    *
@@ -278,9 +281,9 @@ int jpeg_ls_encode(struct stream* stream,
    * above. */
   /* FIXME: this 2-row merging should be made adjustable too. */
   jpeg_write_start(&bitstream, out_rows/2, out_cols*2, channels, bit_depth,
-		   huffman, multi_table, predictor);
-  dataptrs[0] = &huffman[0];
-  dataptrs[1] = &huffman[1];
+		   huffman[predictor], multi_table, predictor);
+  dataptrs[0] = &huffman[predictor][0];
+  dataptrs[1] = &huffman[predictor][1];
   process_image(&bitstream, write_diff, data,
 		enc_rows, out_rows, enc_cols, out_cols,
 		channels, bit_depth, row_width, dataptrs,

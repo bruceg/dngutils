@@ -1,6 +1,6 @@
 - Fill in README
 
-- Figure out why dng_validate.exe thinks DNGs are invalid.
+- Make the predictor optimization optional.
 
 - Break out the DNG specific code from mrw2dng.c
 

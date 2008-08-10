@@ -48,6 +48,38 @@ static void write_diff(struct bitstream* stream,
     jpeg_write_bits(stream, bits, data & ~(~0U << bits));
 }
 
+static void process_row(struct bitstream* stream,
+			void (*fn)(struct bitstream* stream,
+				   int diff,
+				   void* data),
+			const uint16* row0,
+			const uint16* row1,
+			unsigned cols,
+			void* data[],
+			int table1)
+{
+  unsigned col;
+  int pred0;
+  int pred1;
+  int diff0;
+  int diff1;
+
+  pred0 = row0[0];
+  pred1 = row0[1];
+
+  for (col = 0; col < cols; ++col, row0 += 2, row1 += 2) {
+
+    diff0 = row1[0] - pred0;
+    diff1 = row1[1] - pred1;
+
+    fn(stream, diff0, data[0]);
+    fn(stream, diff1, data[table1]);
+
+    pred0 = row1[0];
+    pred1 = row1[1];
+  }
+}
+
 static void process_image(struct bitstream* stream,
 			  void (*fn)(struct bitstream* stream,
 				     int diff,
@@ -64,44 +96,45 @@ static void process_image(struct bitstream* stream,
 			  int multi_table)
 {
   unsigned row;
+  unsigned vrow;
   unsigned col;
-  const uint16* colptr;
-  unsigned pred0;
-  unsigned pred1;
-  int diff0;
-  int diff1;
+  unsigned vcol;
   const int table1 = !!multi_table;
-  
-  pred0 = pred1 = 1 << (bit_depth - 1);
+  uint16 vrows[2][out_cols*channels*2];
+  uint16* vrow0;
+  uint16* vrow1;
+  uint16* ptr;
+  uint16 last0;
+  uint16 last1;
 
-  for (row = 0;
-       row < enc_rows;
-       ++row, rowptr += row_width) {
+  vrow0 = vrows[0];
+  vrow1 = vrows[1];
 
-    if (row > 0 && (row % 2) == 0) {
-      pred0 = rowptr[-row_width*2];
-      pred1 = rowptr[-row_width*2+1];
+  for (row = 0; row < enc_rows; row += 2) {
+
+    if (row == 0)
+      vrow0[0] = vrow0[1] = 1 << (bit_depth - 1);
+
+    for (ptr = vrow1, vcol = vrow = 0; vrow < 2; ++vrow) {
+      for (col = 0; col < enc_cols * channels; ++col, ++vcol, ++ptr)
+	*ptr = rowptr[col];
+      last0 = ptr[-2];
+      last1 = ptr[-1];
+      for (; col < out_cols * channels; col += 2, vcol += 2, ptr += 2) {
+	ptr[0] = last0;
+	ptr[1] = last1;
+      }
+      rowptr += row_width;
     }
 
-    for (col = 0, colptr = rowptr;
-	 col < enc_cols;
-	 ++col, colptr += channels) {
-      diff0 = colptr[0] - pred0;
-      diff1 = colptr[1] - pred1;
+    process_row(stream, fn, vrow0, vrow1, out_cols * 2, data, table1);
 
-      fn(stream, diff0, data[0]);
-      fn(stream, diff1, data[table1]);
-
-      pred0 = colptr[0];
-      pred1 = colptr[1];
-    }
-    for (; col < out_cols; ++col) {
-      fn(stream, 0, data[0]);
-      fn(stream, 0, data[table1]);
-    }
+    ptr = vrow0;
+    vrow0 = vrow1;
+    vrow1 = ptr;
   }
-  for (; row < out_rows; ++row) {
-    for (col = 0; col < out_cols; ++col) {
+  for (; row < out_rows; row += 2) {
+    for (col = 0; col < out_cols * 2; ++col) {
       fn(stream, 0, data[0]);
       fn(stream, 0, data[table1]);
     }
